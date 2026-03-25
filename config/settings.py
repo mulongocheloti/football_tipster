@@ -36,12 +36,4 @@ COMPETITIONS = [
     #"WC" World cup left out, unique group standings, knockout structure, is in the next season
 ]
 
-DB = {
-    "host": "localhost",
-    "database": "football_tipster",
-    "user": "admin",
-    "password": "mulongo1999",
-    "port": 5432
-}
-
 MAX_CALLS_PER_MINUTE = 9
