@@ -1,0 +1,42 @@
+name: Football Tipster ETL
+
+on:
+  schedule:
+    # Runs every day at 06:00 UTC (09:00 EAT).
+    # Adjust the cron expression if you need a different time.
+    # Tool: https://crontab.guru
+    - cron: '0 6 * * *'
+
+  # Allows you to trigger a manual run from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      API_TOKEN:    ${{ secrets.API_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run ETL pipeline
+        run: python main.py
