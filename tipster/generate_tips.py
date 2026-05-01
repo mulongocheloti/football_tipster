@@ -32,9 +32,9 @@ def generate():
         away = m["away_team_id"]
         comp = m["competition_code"]
 
-        # RULE 5 blacklist
-        if home in blacklist_ids or away in blacklist_ids:
-            continue
+        # Changes - Remove this hard skip RULE 5 blacklist
+        # if home in blacklist_ids or away in blacklist_ids:
+        #    continue
 
         home_row = standings[
             (standings.team_id == home) &
@@ -134,6 +134,10 @@ def generate():
 
         if not no_important_match:
             flag_parts.append("important match coming")
+
+        # Check if the FAVOURITE is blacklisted
+        if favourite in blacklist_ids:
+            flag_parts.append("blacklisted")
 
         flag = ", ".join(flag_parts)
 
