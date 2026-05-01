@@ -90,3 +90,23 @@ CREATE TABLE IF NOT EXISTS tip_results (
     outcome         VARCHAR(10),   -- WIN | LOSS
     validated_at    TIMESTAMP DEFAULT NOW()
 );
+
+-- ==========================================
+-- ROW LEVEL SECURITY (RLS)
+-- ==========================================
+
+-- Enable RLS on all tables
+ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE standings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tips ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_blacklist ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_sync_log ENABLE ROW LEVEL SECURITY;
+
+-- Public read access for frontend-facing tables
+CREATE POLICY "Public read" ON tips FOR SELECT USING (true);
+CREATE POLICY "Public read" ON matches FOR SELECT USING (true);
+CREATE POLICY "Public read" ON standings FOR SELECT USING (true);
+CREATE POLICY "Public read" ON teams FOR SELECT USING (true);
+
+-- team_blacklist and api_sync_log: no policy = anon access fully blocked
