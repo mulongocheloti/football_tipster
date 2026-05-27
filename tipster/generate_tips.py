@@ -3,8 +3,17 @@ from datetime import datetime, UTC, timedelta
 from database.db import get_connection
 from features.compute_form import get_form
 
+OFF_SEASON_MONTHS = {5, 6, 7, 8}
+
+def is_off_season():
+    return datetime.now(UTC).month in OFF_SEASON_MONTHS
 
 def generate():
+
+    # Skip tip generation completely during off-season
+    if is_off_season():
+        print("Off-season detected (May-Aug). Skipping tip generation.")
+        return
 
     conn = get_connection()
 
