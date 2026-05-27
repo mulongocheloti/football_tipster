@@ -2,12 +2,19 @@ name: Football Tipster ETL
 
 on:
   schedule:
-    # Runs every day at 06:00 UTC (09:00 EAT).
     # Adjust the cron expression if you need a different time.
     # Tool: https://crontab.guru
     # GitHub Actions cron schedules don't run at exactly the scheduled minute — they get queued and can start with a delay
-    - cron: '0 0 * * *'   # 3:00 AM EAT
-    - cron: '0 6 * * *'   # 9:00 AM EAT
+    
+    # In-season (Sep–Apr):
+    # Runs twice every day at 00:00 UTC and 06:00 UTC
+    - cron: '0 0 * 9-12,1-4 *'   # 3:00 AM EAT
+    - cron: '0 6 * 9-12,1-4 *'   # 9:00 AM EAT
+
+    # Off-season reduced runs (May–Aug):
+    # Runs ONLY on Wednesdays and Saturdays at 06:00 UTC
+    # Aim is to avoid Supabase from pausing free tier projects after 7 days of inactivity
+    - cron: '0 6 * 5-8 3,6'      # Wed & Sat at 9:00 AM EAT
 
   # Allows you to trigger a manual run from the GitHub Actions tab
   workflow_dispatch:
@@ -18,7 +25,7 @@ jobs:
 
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
-      API_TOKEN:    ${{ secrets.API_TOKEN }}
+      API_TOKEN: ${{ secrets.API_TOKEN }}
 
     steps:
       - name: Checkout repository
