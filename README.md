@@ -92,7 +92,7 @@ football-data.org API
   ┌─────────────────────┐
   │  Supabase           │
   │  (PostgreSQL)       │
-  │  port 5432   │
+  │  port 5432          │
   └────────┬────────────┘
            │
            ▼
