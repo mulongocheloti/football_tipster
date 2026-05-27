@@ -1,6 +1,72 @@
-# ⚽ Football Tipster
+# ⚽ Football Tipster — Backend
 
-An automated football betting tip generation and validation system built with Python, PostgreSQL (Supabase), and GitHub Actions. The pipeline runs daily, ingests live match and standings data, applies rule-based logic to generate tips, and tracks prediction accuracy over time.
+> Python ETL pipeline that fetches live football data, generates rule-based predictions, validates outcomes, and writes everything to a Supabase PostgreSQL database. Runs automatically every day via GitHub Actions.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [How It Works](#how-it-works)
+- [Setup & Installation](#setup--installation)
+- [Configuration](#configuration)
+- [Running the Pipeline](#running-the-pipeline)
+- [ETL Modules](#etl-modules)
+- [Tipster Engine](#tipster-engine)
+- [Database](#database)
+- [GitHub Actions (Cron)](#github-actions-cron)
+- [Dependencies](#dependencies)
+
+---
+
+## Overview
+
+This backend is the data engine behind the Football Tipster dashboard. It:
+
+1. Pulls match, standings, and team data from the [football-data.org](https://www.football-data.org/) API
+2. Upserts everything into Supabase (PostgreSQL via the port 5432)
+3. Runs a rule-based engine to generate match prediction tips
+4. Validates tips against real match results and writes WIN / LOSS / ODD FLAT outcomes
+5. Repeats daily at **06:00 UTC** via a GitHub Actions cron job
+
+---
+
+## Project Structure
+
+```
+football-tipster-backend/
+│
+├── config/
+│   └── settings.py                  # env-var based config, season, competition codes
+│
+├── database/
+│   ├── db.py                        # Supabase client (port 5432)
+│   └── schema.sql                   # Full PostgreSQL schema + RLS policies
+│
+├── api/
+│   └── football_api.py              # football-data.org API wrapper
+│
+├── etl/
+│   ├── sync_matches.py              # Fetch & upsert fixtures/results
+│   ├── sync_standings.py            # Fetch & upsert league tables
+│   └── sync_teams.py                # Fetch & upsert team metadata
+│
+├── features/
+│   └── form.py                      # last-7-match form computation
+│
+├── tipster/
+│   ├── generate_tips.py             # Rule-based prediction engine → tips table
+│   └── validate_tips.py             # Join tips vs results → tip_results table
+│
+├── main.py                          # Orchestrator: runs the full pipeline end-to-end
+│
+├── requirements.txt                 # Python dependencies
+│
+└── .github/
+    └── workflows/
+        └── etl.yml                  # GitHub Actions cron (daily 06:00 UTC)
+```
 
 ---
 
@@ -10,118 +76,70 @@ An automated football betting tip generation and validation system built with Py
 football-data.org API
         │
         ▼
-  GitHub Actions (daily cron)
-        │
-        ├── sync_matches.py    ← fetch & upsert match data
-        ├── sync_standings.py  ← fetch & upsert league tables
-        │
-        ▼
-  generate_tips.py             ← apply rules, produce tips
-        │
-        ▼
-  validate_tips.py             ← score finished tips WIN/LOSS
-        │
-        ▼
-  Supabase (PostgreSQL)        ← persists everything
-        │
-        ▼
-  Next.js Frontend (Vercel)    ← dashboard, results, stats
+  ┌─────────────────────┐
+  │   Python ETL        │
+  │  sync_matches.py    │
+  │  sync_standings.py  │
+  │  sync_teams.py      │
+  └────────┬────────────┘
+           │  upsert
+           ▼
+  ┌─────────────────────┐
+  │  Supabase           │
+  │  (PostgreSQL)       │
+  │  port 5432   │
+  └────────┬────────────┘
+           │
+           ▼
+  ┌─────────────────────┐
+  │  Tipster Engine     │
+  │  generate_tips.py   │──▶  tips table
+  └────────┬────────────┘
+           │
+           ▼
+  ┌─────────────────────┐
+  │  Validator          │
+  │  validate_tips.py   │──▶  tip_results table
+  └─────────────────────┘
 ```
 
 ---
 
-## Features
+## Setup & Installation
 
-- **Automated ETL** — daily sync of matches and standings across 9 competitions via GitHub Actions
-- **Rule-based tip engine** — 6 layered rules filtering for high-confidence opportunities
-- **Form analysis** — last-7-match form strings (e.g. `WWDLWDW..`) computed per team
-- **Tip validation** — automatic WIN/LOSS scoring once matches finish
-- **Performance stats** — win rate breakdown by prediction type, competition, and confidence level
-- **Zero-cost production stack** — Supabase + GitHub Actions + Vercel, all on free tiers
-
----
-
-## Tip Generation Rules
-
-| Rule | Description |
-|------|-------------|
-| **Rule 1** | Points difference between teams must be ≥ 10 |
-| **Rule 2** | Clear favourite identified by league position (top 7 home or top 4 away) |
-| **Rule 3** | Favourite must have ≥ 4 days rest since last match |
-| **Rule 4** | Favourite must have no important match (CL, Cup) within 3 days |
-| **Rule 5** | Neither team appears on the blacklist |
-| **Rule 6** | Favourite must not have 3+ losses in their last 7 matches |
-
-### Prediction Types
-
-| Prediction | Meaning | Condition |
-|------------|---------|-----------|
-| `1-DNB` | Back home team, Draw No Bet | Home favourite, rested, no important match |
-| `2-DNB` | Back away team, Draw No Bet | Away favourite, rested, no important match |
-| `1X` | Home win or Draw | Home favourite, not fully rested |
-| `X2` | Draw or Away win | Away favourite, not fully rested |
-
----
-
-## Tech Stack
+### Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Language | Python 3.11 |
 | Database | PostgreSQL via Supabase |
 | Scheduling | GitHub Actions (cron) |
-| Data source | football-data.org API |
-| Frontend | Next.js + Supabase JS client |
-| Hosting | Vercel (frontend) · GitHub Actions (ETL) |
+| Data source | [football-data.org](https://www.football-data.org/) API |
 
----
+### Install dependencies
 
-## Project Structure
+```bash
+git clone https://github.com/mulongocheloti/football_tipster.git
+cd football-tipster-backend
 
-```
-football_tipster/
-│
-├── .github/
-│   └── workflows/
-│       └── etl.yml           ← scheduled pipeline
-│
-├── api/
-│   └── football_api.py       ← rate-limited API client
-│
-├── config/
-│   └── settings.py           ← env-var based config
-│
-├── database/
-│   ├── db.py                 ← psycopg2 connection
-│   └── schema.sql            ← table definitions
-│
-├── etl/
-│   ├── sync_matches.py       ← match ingestion
-│   ├── sync_standings.py     ← standings ingestion
-│   └── sync_teams.py         ← team upsert helper
-│
-├── features/
-│   └── form.py               ← last-7-match form computation
-│
-├── migrations/
-│   ├── add_form_columns.sql
-│   └── create_tip_results.sql
-│
-├── tipster/
-│   ├── generate_tips.py      ← tip generation engine
-│   └── validate_tips.py      ← WIN/LOSS validation
-│
-├── app/                      ← Next.js frontend
-│
-├── main.py                   ← pipeline entry point
-├── requirements.txt
-├── .env.example
-└── .gitignore
+python -m venv venv
+source venv/bin/activate        # Windows: venv\Scripts\activate
+
+pip install -r requirements.txt
 ```
 
 ---
 
-## Competitions Covered
+## Configuration
+
+Create a `.env` file in the project root (never commit this):
+
+```env
+API_TOKEN=your_football_data_org_api_key
+DATABASE_URL=your_supabase_connection_string_port_5432
+```
+
+`config/settings.py` reads these variables and also holds the current season and list of competition codes the pipeline tracks.
 
 | Code | League |
 |------|--------|
@@ -135,85 +153,144 @@ football_tipster/
 | PPL | Primeira Liga (Portugal) |
 | ELC | Championship (England) |
 
+> **Note:** `DATABASE_URL` points to Supabase on port 5432. The backend connects with the service role so it can write past RLS. The frontend uses the anon key with RLS enforced.
+
 ---
 
-## Local Setup
+## Running the Pipeline
 
-**1. Clone the repo**
-```bash
-git clone https://github.com/mulongocheloti/football_tipster.git
-cd football_tipster
-```
+Run the full pipeline manually:
 
-**2. Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-**3. Create your `.env` file**
-```bash
-cp .env.example .env
-# Fill in API_TOKEN and DATABASE_URL
-```
-
-**4. Run the schema against your database**
-```sql
--- Run in order:
--- database/schema.sql
--- migrations/add_form_columns.sql
--- migrations/create_tip_results.sql
-```
-
-**5. Run the pipeline**
 ```bash
 python main.py
 ```
 
+`main.py` orchestrates the steps in this order:
+
+1. `sync_teams` — ensures team metadata is up to date
+2. `sync_standings` — refreshes league table positions
+3. `sync_matches` — upserts fixtures and results for configured competitions
+4. `generate_tips` — applies prediction rules to upcoming matches
+5. `validate_tips` — checks finished matches and updates tip outcomes
+
+You can also run individual modules:
+
+```bash
+python -m etl.sync_matches
+python -m etl.sync_standings
+python -m tipster.generate_tips
+python -m tipster.validate_tips
+```
+
 ---
 
-## Production Deployment
+## ETL Modules
 
-| Component | Service | Cost |
-|-----------|---------|------|
-| Database | Supabase (free tier) | $0 |
-| ETL scheduling | GitHub Actions (free tier) | $0 |
-| Frontend hosting | Vercel (free tier) | $0 |
+### `etl/sync_matches.py`
 
-The pipeline runs automatically every day at **06:00 UTC** via GitHub Actions. Secrets (`DATABASE_URL`, `API_TOKEN`) are stored in GitHub repository secrets and never committed to code.
+Fetches upcoming and recently finished matches for all configured competitions. Uses an **upsert** (`on_conflict: match_id`) so re-runs are safe and idempotent. Stores UTC kick-off times; the frontend converts to EAT (UTC+3).
+
+### `etl/sync_standings.py`
+
+Fetches current league table standings per competition. Updates team position, points, goal difference, form, and wins/draws/losses.
+
+### `etl/sync_teams.py`
+
+Fetches and upserts team metadata (name, short name, crest URL, competition). Run when new teams need to be seeded.
 
 ---
 
-## Environment Variables
+## Tipster Engine
 
-| Variable | Description |
-|----------|-------------|
-| `API_TOKEN` | football-data.org API key |
-| `DATABASE_URL` | PostgreSQL connection string (Supabase pooler URL) |
+### `tipster/generate_tips.py`
 
-For the Next.js frontend:
+Applies a set of rule-based heuristics to upcoming matches to produce predictions. Each tip is written to the `tips` table with:
 
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase public anon key |
+| Field | Description |
+|---|---|
+| `match_id` | FK to matches table |
+| `prediction` | e.g. `1X`, `X2`, `1-DNB`, `2-DNB` |
+| `confidence` | Score from 0–5 |
+| `flag` | Optional warning label (e.g. `Rule 6`) |
+
+Rules are built on features such as: recent form strings, home/away performance, standings position, head-to-head records, and loss streaks.
+
+| Rule | Description |
+|------|-------------|
+| **Rule 1** | Points difference between teams must be ≥ 10 |
+| **Rule 2** | Clear favourite identified by league position (top 7 home or top 4 away) |
+| **Rule 3** | Favourite must have ≥ 4 days rest since last match |
+| **Rule 4** | Favourite must have no important match (CL, Cup) within 3 days |
+| **Rule 5** | Favourite must not have 3+ losses in their last 7 matches |
+| **Rule 6** | Flag(s) - blacklisted/not rested/important match upcoming |
+
+| Prediction | Meaning | Condition |
+|------------|---------|-----------|
+| `1-DNB` | Back home team, Draw No Bet | Home favourite, rested, no important match |
+| `2-DNB` | Back away team, Draw No Bet | Away favourite, rested, no important match |
+| `1X` | Home win or Draw | Home favourite, not fully rested |
+| `X2` | Draw or Away win | Away favourite, not fully rested |
+
+### `tipster/validate_tips.py`
+
+After matches finish, joins the `tips` table against actual results and writes each outcome (`WIN`, `LOSS`, or `ODD FLAT`) to the `tip_results` table. Only processes matches with a final score that don't already have a validated result.
 
 ---
 
 ## Database Schema
 
-```sql
-teams           -- team_id, team_name
-matches         -- match data, scores, status
-standings       -- league table per competition per season
-tips            -- generated tips with form strings and flags
-tip_results     -- validated outcomes (WIN/LOSS) with actual scores
-team_blacklist  -- teams excluded from tip generation
-api_sync_log    -- tracks last sync per competition to avoid redundant calls
-```
+The full schema lives in `database/schema.sql`. Key tables:
+
+| Table | Purpose |
+|---|---|
+| `teams` | Team metadata (id, name, competition) |
+| `matches` | Fixtures and results (scores, status, UTC date) |
+| `standings` | League table rows per competition per season |
+| `tips` | Generated predictions |
+| `tip_results` | Validated tip outcomes (WIN / LOSS / ODD FLAT) |
+| `team_blacklist` | Teams with poor form / inconsistent |
+| `api_sync_log` | Tracks last sync per competition to avoid redundant calls |
+
+**Row Level Security (RLS)** is enabled on all tables. The frontend anon key has `SELECT` access only. All writes go through the service role key (backend only).
+
+Connection is made via Supabase on **port 5432** to keep connections efficient in the serverless/cron context.
 
 ---
 
-## Author
+## GitHub Actions (Cron)
 
-**Paul Cheloti Mulongo**
-Built as a personal data engineering project — from local Python scripts to a fully automated production pipeline.
+`.github/workflows/etl.yml` runs `python main.py` every day at **06:00 UTC**.
+
+```yaml
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:        # also allows manual runs from the Actions tab
+```
+
+Secrets required in the repository's **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|---|---|
+| `API_TOKEN` | Your football-data.org API key |
+| `DATABASE_URL` | Your Supabase connection string (port 5432) |
+
+---
+
+## Dependencies
+
+```
+supabase
+requests
+python-dotenv
+```
+
+Full pinned versions in `requirements.txt`.
+
+---
+
+## Related
+
+- **Frontend repo:** [`football-tipster-frontend`](https://github.com/mulongocheloti/football-tipster-frontend) — Next.js 14 dashboard deployed on Vercel
+- **Data source:** [football-data.org](https://www.football-data.org/)
+- **Database:** [Supabase](https://supabase.com/)
