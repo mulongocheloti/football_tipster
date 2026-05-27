@@ -20,6 +20,11 @@
 
 ---
 
+## Architecture Diagram
+
+<img src="assets/architecture.png" width="1200" alt="Data Pipeline Architecture"/>
+
+---
 ## Overview
 
 This backend is the data engine behind the Football Tipster dashboard. It:
