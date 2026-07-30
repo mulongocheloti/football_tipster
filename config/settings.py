@@ -16,7 +16,8 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 # api token moved to github secrets
 
 SEASONS = [
-            2025,  # 2025-2026
+            2026 # 2026-2027 new season
+            #2025,  # data already fetched and will never change
             #2024 # data already fetched and will never change
             #2023, # data already fetched and will never change
             #<= 2022 # data not available with free tier
